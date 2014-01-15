@@ -1,5 +1,6 @@
 <?php
 
+
 require_once('../simplehtmldom/simple_html_dom.php');
 
 $html = 'aaaaa<div data-widget-type="form" data-widget-id="52d5fb7ab2979" data-variable="">dasfasdfasdfasdf</div>bbbbb';
