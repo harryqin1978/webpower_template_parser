@@ -2,9 +2,9 @@
 
 require_once('../simplehtmldom/simple_html_dom.php');
 
-$html = 'aaaaa<div data-widget-type="form" data-widget-id="52d5fb7ab2979" data-variable=“”>dasfasdfasdfasdf</div>bbbbb';
+$html = 'aaaaa<div data-widget-type="form" data-widget-id="52d5fb7ab2979" data-variable="">dasfasdfasdfasdf</div>bbbbb';
 $tp = new TemplateParser($html);
-echo htmlspecialchars($tp->parseTest());
+echo '<textarea cols="150" rows="50">' . $tp->parseTest() . '</textarea>';
 
 class TemplateParser
 {
@@ -37,7 +37,18 @@ class TemplateParser
     public function parseTest() {
         $dom = str_get_html($this->origin);
         foreach($dom->find('div[data-widget-id]') as $e) {
-            $e->outertext = '<?php include("' . $this->plugin_file_guid_mappers[$e->getAttribute('data-widget-id')] . '"); ?>';
+            $attrs = $e->getAllAttributes();
+            $attrs_php = '$attrs = array(' . "\n";
+            foreach ($attrs as $key => $value) {
+                $attrs_php .= '  $' . $key . ' => \'' . $value . '\',' . "\n";
+            }
+            $attrs_php .= ');';
+            $e->outertext =
+                "\n" . 
+                '<?php' . "\n" . 
+                $attrs_php . "\n" .
+                'include("' . $this->plugin_file_guid_mappers[$e->getAttribute('data-widget-id')] . '");' . "\n" .
+                '?>' . "\n";
         }
         return $dom->save();
     }
