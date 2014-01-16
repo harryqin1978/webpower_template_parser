@@ -36,7 +36,11 @@ abstract class TemplateParser
     protected function parseJson($json_str) {
         $json_str = preg_replace("/([a-zA-Z0-9_]+?):/" , "\"$1\":", $json_str);
         $json_array = json_decode($json_str, true);
-        return $json_array;
+        if (json_last_error() === JSON_ERROR_NONE) { 
+            return $json_array;
+        } else {
+            return false;
+        }
     }
 
     abstract public function parseTest();
@@ -50,15 +54,19 @@ class CkeditorTemplateParser extends TemplateParser
     public function parseTest() {
         $dom = str_get_html($this->origin);
         $output = '';
-        foreach($dom->find('div[data-widget-id]') as $e) {
-            $output .= 'widget-id:\'' . $e->getAttribute('data-widget-id') . '\'' . "\n";
+        foreach($dom->find('div[data-widget-type]') as $e) {
+            $output .= 'widget-id:\'' . $e->getAttribute('id') . '\'' . "\n";
             $output .= 'widget-type:\'' . $e->getAttribute('data-widget-type') . '\'' . "\n";
-            $output .= 'widget-name:\'' . (isset($this->plugin_file_guid_mappers[$e->getAttribute('data-widget-id')]) ? $this->plugin_file_guid_mappers[$e->getAttribute('data-widget-id')] : 'undefined') . '\'' . "\n";
+            $output .= 'widget-name:\'' . (isset($this->plugin_file_guid_mappers[$e->getAttribute('id')]) ? $this->plugin_file_guid_mappers[$e->getAttribute('id')] : 'undefined') . '\'' . "\n";
             $output .= 'widget-role:\'' . $e->getAttribute('data-widget-role') . '\'' . "\n";
             $value = $e->getAttribute('data-widget-bind');
             if (substr($value, 0, 1) == '{') {
                 $json_array = $this->parseJson($value);
-                $real_value = "\n" . '{' . "\n" . $this->parseJsonArray($json_array) . '}';
+                if ($json_array) {
+                    $real_value = "\n" . '{' . "\n" . $this->parseJsonArray($json_array) . '}';
+                } else {
+                    $real_value = '\'' . '[JSON_PARSE_ERROR]' . '\'';
+                }
             } else {
                 $real_value = '\'' . $value . '\'';
             }
