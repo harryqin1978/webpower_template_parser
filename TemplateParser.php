@@ -1,15 +1,6 @@
 <?php
 
-
 require_once('../simplehtmldom/simple_html_dom.php');
-
-$html = '<div data-widget-type="form" data-widget-id="52d5fb7ab2979" data-variable=\'{a:10,b:"strimg",c:true}\'>dasfasdfasdfasdf</div>
-<p>Hello</p>
-<div data-widget-type="form" data-widget-id="52d5fb7ab29e5" data-variable="">dasfasdfasdfasdf</div>
-<div data-widget-type="plugin" data-widget-id="blabla" data-variable="">dasfasdfasdfasdf</div>';
-$tp = new CkeditorTemplateParser($html);
-echo 'Input: <br /><textarea cols="150" rows="25">' . $tp->getOrigin() . '</textarea><br />';
-echo 'Output: <br /><textarea cols="150" rows="25">' . $tp->parseTest() . '</textarea><br />';
 
 
 
@@ -42,7 +33,14 @@ abstract class TemplateParser
       return $this->origin;
     }
 
+    protected function parseJson($json_str) {
+        $json_str = preg_replace("/([a-zA-Z0-9_]+?):/" , "\"$1\":", $json_str);
+        $json_array = json_decode($json_str, true);
+        return $json_array;
+    }
+
     abstract public function parseTest();
+    abstract protected function parseJsonArray($json_array);
 }
 
 
@@ -56,20 +54,33 @@ class CkeditorTemplateParser extends TemplateParser
             $output .= 'widget-id:\'' . $e->getAttribute('data-widget-id') . '\'' . "\n";
             $output .= 'widget-type:\'' . $e->getAttribute('data-widget-type') . '\'' . "\n";
             $output .= 'widget-name:\'' . (isset($this->plugin_file_guid_mappers[$e->getAttribute('data-widget-id')]) ? $this->plugin_file_guid_mappers[$e->getAttribute('data-widget-id')] : 'undefined') . '\'' . "\n";
-            $value = $e->getAttribute('data-variable');
+            $output .= 'widget-role:\'' . $e->getAttribute('data-widget-role') . '\'' . "\n";
+            $value = $e->getAttribute('data-widget-bind');
             if (substr($value, 0, 1) == '{') {
-                $real_value = "\n" . '{' . "\n";
-                $inner_value = trim($value, '{}');
-                $inner_values = explode(',', $inner_value);
-                foreach ($inner_values as $v) {
-                    $real_value .= '  ' . $v . "\n";
-                }
-                $real_value .= '}';
+                $json_array = $this->parseJson($value);
+                $real_value = "\n" . '{' . "\n" . $this->parseJsonArray($json_array) . '}';
             } else {
                 $real_value = '\'' . $value . '\'';
             }
-            $output .= 'variable:' . $real_value . '' . "\n";
+            $output .= 'widget-bind:' . $real_value . '' . "\n";
+            $output .= 'widget-language:\'' . $e->getAttribute('data-widget-language') . '\'' . "\n";
+            $output .= 'widget-class:\'' . $e->getAttribute('data-widget-class') . '\'' . "\n";
             $output .= $this->divider . "\n";
+        }
+        return $output;
+    }
+
+    protected function parseJsonArray($json_array, $depth = 0) {
+        $output = '';
+        foreach ($json_array as $key => $value) {
+            if (is_array($value)) {
+                $output .= str_repeat(' ', $depth*2+2) . $key . ':' . "\n" . $this->parseJsonArray($value, $depth+1);
+            } else {
+                if (is_bool($value)) {
+                    $value = (int) $value;
+                }
+                $output .= str_repeat(' ', $depth*2+2) . $key . ':' . (is_string($value) ? '"'.$value.'"' : $value) . "\n";
+            }
         }
         return $output;
     }
