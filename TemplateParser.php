@@ -23,7 +23,6 @@ abstract class TemplateParser
         '52d5fb7ab2d4e' => 'subscribe.php',
         '52d5fb7ab2db9' => 'unsubscribe.php'
     );
-    protected $divider = "========================";
 
     function __construct($origin) {
         $this->origin = $origin;
@@ -51,43 +50,57 @@ abstract class TemplateParser
 
 class CkeditorTemplateParser extends TemplateParser
 {
-    public function parseTest() {
-        $dom = str_get_html($this->origin);
+
+    protected $divider = "========================";
+    protected $dom_indent = 4;
+    protected $json_indent = 2;
+
+    public function parseTest($dom = NULL, $depth = 0) {
+        if (!$dom) {
+            $dom = str_get_html($this->origin);
+        }
         $output = '';
-        foreach($dom->find('div[data-widget-type]') as $e) {
-            $output .= 'widget-id:\'' . $e->getAttribute('id') . '\'' . "\n";
-            $output .= 'widget-type:\'' . $e->getAttribute('data-widget-type') . '\'' . "\n";
-            $output .= 'widget-name:\'' . (isset($this->plugin_file_guid_mappers[$e->getAttribute('id')]) ? $this->plugin_file_guid_mappers[$e->getAttribute('id')] : 'undefined') . '\'' . "\n";
-            $output .= 'widget-role:\'' . $e->getAttribute('data-widget-role') . '\'' . "\n";
-            $value = $e->getAttribute('data-widget-bind');
-            if (substr($value, 0, 1) == '{') {
-                $json_array = $this->parseJson($value);
-                if ($json_array) {
-                    $real_value = "\n" . '{' . "\n" . $this->parseJsonArray($json_array) . '}';
+        $children = $dom->childNodes();
+        foreach($children as $e) {
+            if ($e->hasAttribute('data-widget-type')) {
+                $dom_indent_str = str_repeat(' ', $this->dom_indent * $depth);
+                $output .= $dom_indent_str . 'widget-depth:' . ($depth + 1) . "\n";
+                $output .= $dom_indent_str . 'widget-id:\'' . $e->getAttribute('id') . '\'' . "\n";
+                $output .= $dom_indent_str . 'widget-type:\'' . $e->getAttribute('data-widget-type') . '\'' . "\n";
+                $output .= $dom_indent_str . 'widget-name:\'' . (isset($this->plugin_file_guid_mappers[$e->getAttribute('id')]) ? $this->plugin_file_guid_mappers[$e->getAttribute('id')] : 'undefined') . '\'' . "\n";
+                $output .= $dom_indent_str . 'widget-role:\'' . $e->getAttribute('data-widget-role') . '\'' . "\n";
+                $value = $e->getAttribute('data-widget-bind');
+                if (substr($value, 0, 1) == '{') {
+                    $json_array = $this->parseJson($value);
+                    if ($json_array) {
+                        $real_value = "\n" . $dom_indent_str . '{' . "\n" . $this->parseJsonArray($json_array, 0, $depth) . $dom_indent_str . '}';
+                    } else {
+                        $real_value = '\'' . '[JSON_PARSE_ERROR]' . '\'';
+                    }
                 } else {
-                    $real_value = '\'' . '[JSON_PARSE_ERROR]' . '\'';
+                    $real_value = '\'' . $value . '\'';
                 }
-            } else {
-                $real_value = '\'' . $value . '\'';
+                $output .= $dom_indent_str . 'widget-bind:' . $real_value . '' . "\n";
+                $output .= $dom_indent_str . 'widget-language:\'' . $e->getAttribute('data-widget-language') . '\'' . "\n";
+                $output .= $dom_indent_str . 'widget-class:\'' . $e->getAttribute('data-widget-class') . '\'' . "\n";
+                $output .= $this->divider . "\n";
+                $output .= $this->parseTest($e, $depth+1);
             }
-            $output .= 'widget-bind:' . $real_value . '' . "\n";
-            $output .= 'widget-language:\'' . $e->getAttribute('data-widget-language') . '\'' . "\n";
-            $output .= 'widget-class:\'' . $e->getAttribute('data-widget-class') . '\'' . "\n";
-            $output .= $this->divider . "\n";
         }
         return $output;
     }
 
-    protected function parseJsonArray($json_array, $depth = 0) {
+    protected function parseJsonArray($json_array, $depth = 0, $dom_depth = 0) {
         $output = '';
         foreach ($json_array as $key => $value) {
+            $json_depth_str = $depth * $this->json_indent + $this->json_indent + $this->dom_indent * $dom_depth;
             if (is_array($value)) {
-                $output .= str_repeat(' ', $depth*2+2) . $key . ':' . "\n" . $this->parseJsonArray($value, $depth+1);
+                $output .= str_repeat(' ', $json_depth_str) . $key . ':' . "\n" . $this->parseJsonArray($value, $depth+1, $dom_depth);
             } else {
                 if (is_bool($value)) {
                     $value = (int) $value;
                 }
-                $output .= str_repeat(' ', $depth*2+2) . $key . ':' . (is_string($value) ? '"'.$value.'"' : $value) . "\n";
+                $output .= str_repeat(' ', $json_depth_str) . $key . ':' . (is_string($value) ? '"'.$value.'"' : $value) . "\n";
             }
         }
         return $output;
